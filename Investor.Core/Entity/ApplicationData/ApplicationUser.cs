@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using Investor.Core.Entity.ChatandUserConnection;
 using Investor.Core.Entity.ConnectionData;
 using Investor.Core.Entity.EvaluationData;
 using Investor.Core.Entity.PostData;
@@ -26,6 +27,7 @@ public class ApplicationUser : IdentityUser
     public IEnumerable<Post> Posts { get; set; } = new List<Post>(); // for all users
     public IEnumerable<EvaluationUser> EvaluationUsers { get; set; } = new List<EvaluationUser>(); // for all users
     public IEnumerable<Connection> connections { get; set; } = new List<Connection>(); // for all users
+    public IEnumerable<Chat> chats { get; set; } = new List<Chat>();
 
     //------------------------------------------------------------------------------------------------
     [NotMapped]

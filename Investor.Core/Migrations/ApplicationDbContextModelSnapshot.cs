@@ -195,7 +195,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("SendUserId");
 
-                    b.ToTable("Chats");
+                    b.ToTable("Chats", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.ChatandUserConnection.UserConnection", b =>
@@ -216,7 +216,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserConnections");
+                    b.ToTable("UserConnections", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.ConnectionData.Connection", b =>
@@ -240,7 +240,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("User2Id");
 
-                    b.ToTable("Connections");
+                    b.ToTable("Connections", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.EvaluationData.EvaluationUser", b =>
@@ -278,7 +278,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("EvaluationUsers");
+                    b.ToTable("EvaluationUsers", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.PostData.Category", b =>
@@ -296,7 +296,7 @@ namespace Investor.Core.Migrations
 
                     b.HasKey("CategoryId");
 
-                    b.ToTable("Categories");
+                    b.ToTable("Categories", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.PostData.CommentPost", b =>
@@ -328,7 +328,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CommentPosts");
+                    b.ToTable("CommentPosts", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.PostData.Post", b =>
@@ -362,7 +362,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Posts");
+                    b.ToTable("Posts", (string)null);
                 });
 
             modelBuilder.Entity("Investor.Core.Entity.PostData.ReactPost", b =>
@@ -385,7 +385,7 @@ namespace Investor.Core.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("ReactPosts");
+                    b.ToTable("ReactPosts", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

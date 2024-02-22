@@ -463,4 +463,54 @@ public class UserController : ControllerBase
         return Ok(_baseResponse);
     }
 
+    //----------------------------------------------------------------------------------------------------- Search
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    [HttpGet("Search")]
+    public async Task<ActionResult<BaseResponse>> Search([FromHeader] string lang, [FromForm] string TargetSearch)
+    {
+        var userId = this.User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
+        if (string.IsNullOrEmpty(userId))
+        {
+            _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+            _baseResponse.ErrorMessage = (lang == "ar") ? "المستخدم غير موجود" : "User not exist";
+            _baseResponse.Data = null;
+            return Ok(_baseResponse);
+        }
+        // Split the full name into an array of words
+        string[] nameParts = TargetSearch.Split(' ');
+        if(nameParts.Length != 1 )
+        {
+            // Assuming the first word is the first name and the last word is the last name
+            string firstName = nameParts[0];
+            string lastName = nameParts[1];
+            var user = await _unitOfWork.Users.FindByQuery(s => s.FirstName == firstName && s.LastName == lastName).Select(x => new
+            {
+                x.Id,
+                x.FirstName,
+                x.LastName,
+                x.Email,
+                x.Age,
+                x.Job,
+                x.Status,
+                x.Qualification,
+                x.PhoneNumber
+            }).FirstOrDefaultAsync();
+            _baseResponse.ErrorCode = 0;
+            _baseResponse.Data = user;
+            return Ok(_baseResponse);
+        }
+        var catagory = await _unitOfWork.Catagories.FindByQuery(x => x.CategoryName == x.CategoryName).FirstOrDefaultAsync();
+        if (catagory != null)
+        {
+            var post = await _unitOfWork.Posts.FindByQuery(s => s.CatagoryId == catagory.CategoryId).FirstOrDefaultAsync();
+            _baseResponse.ErrorCode = 0;
+            _baseResponse.Data = post;
+            return Ok(_baseResponse);
+        }
+        _baseResponse.ErrorCode = (int)Errors.NotFound;
+        _baseResponse.ErrorMessage = (lang == "ar") ? "لم يتم العثور علي شئ" : "Search not Found";
+        _baseResponse.Data = null;
+        return Ok(_baseResponse);
+
+    }
 }

@@ -81,6 +81,9 @@ namespace Investor.Core
                 .HasOne(p => p.Post)
                 .WithMany(b => b.Reacts);
 
+            modelBuilder.Entity<Chat>()
+                .HasOne(p => p.SendUser)
+                .WithMany(b => b.chats);
         }
     }
 }
