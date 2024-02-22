@@ -1,5 +1,5 @@
 ﻿using Investor.Core.Entity.ApplicationData;
-using Investor.Core.Entity.ChatAndNotification;
+using Investor.Core.Entity.ChatandUserConnection;
 using Investor.Core.Entity.ConnectionData;
 using Investor.Core.Entity.EvaluationData;
 using Investor.Core.Entity.PostData;
@@ -20,7 +20,7 @@ public interface IUnitOfWork : IDisposable
     IBaseRepository<EvaluationUser> EvaluationUser { get; }
 
     IBaseRepository<Connection> Connections { get; }
-    //IBaseRepository<MessageChat> MessageChats { get; }
+    IBaseRepository<Chat> Chats { get; }
     IBaseRepository<UserConnection> UserConnections { get; }
     //-----------------------------------------------------------------------------------
     int SaveChanges();

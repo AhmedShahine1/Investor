@@ -31,7 +31,7 @@ public class EvaluationsController : BaseController , IActionFilter
             return;
 
         var userId = User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
-        var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId)
+        var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == false)
             .FirstOrDefault();
         _user = user;
         

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Investor.Core.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20240221202733_Createtable")]
-    partial class Createtable
+    [Migration("20240222164217_createTableChat")]
+    partial class createTableChat
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -67,6 +67,9 @@ namespace Investor.Core.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("AccessFailedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Age")
                         .HasColumnType("int");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -153,7 +156,52 @@ namespace Investor.Core.Migrations
                     b.ToTable("Users", "dbo");
                 });
 
-            modelBuilder.Entity("Investor.Core.Entity.ChatAndNotification.UserConnection", b =>
+            modelBuilder.Entity("Investor.Core.Entity.ChatandUserConnection.Chat", b =>
+                {
+                    b.Property<string>("ChatId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("AttachmentUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsUpdated")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2147483647)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ReceiveUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("SendUserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ChatId");
+
+                    b.HasIndex("ReceiveUserId");
+
+                    b.HasIndex("SendUserId");
+
+                    b.ToTable("Chats");
+                });
+
+            modelBuilder.Entity("Investor.Core.Entity.ChatandUserConnection.UserConnection", b =>
                 {
                     b.Property<string>("UserConnectionId")
                         .HasColumnType("nvarchar(450)");
@@ -200,11 +248,8 @@ namespace Investor.Core.Migrations
 
             modelBuilder.Entity("Investor.Core.Entity.EvaluationData.EvaluationUser", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<string>("EvaluationId")
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -230,7 +275,7 @@ namespace Investor.Core.Migrations
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
 
-                    b.HasKey("Id");
+                    b.HasKey("EvaluationId");
 
                     b.HasIndex("TargetUserId");
 
@@ -452,7 +497,22 @@ namespace Investor.Core.Migrations
                     b.ToTable("UserTokens", "dbo");
                 });
 
-            modelBuilder.Entity("Investor.Core.Entity.ChatAndNotification.UserConnection", b =>
+            modelBuilder.Entity("Investor.Core.Entity.ChatandUserConnection.Chat", b =>
+                {
+                    b.HasOne("Investor.Core.Entity.ApplicationData.ApplicationUser", "ReceiveUser")
+                        .WithMany()
+                        .HasForeignKey("ReceiveUserId");
+
+                    b.HasOne("Investor.Core.Entity.ApplicationData.ApplicationUser", "SendUser")
+                        .WithMany()
+                        .HasForeignKey("SendUserId");
+
+                    b.Navigation("ReceiveUser");
+
+                    b.Navigation("SendUser");
+                });
+
+            modelBuilder.Entity("Investor.Core.Entity.ChatandUserConnection.UserConnection", b =>
                 {
                     b.HasOne("Investor.Core.Entity.ApplicationData.ApplicationUser", "User")
                         .WithMany()

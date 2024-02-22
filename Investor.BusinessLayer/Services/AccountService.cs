@@ -7,7 +7,7 @@ using Investor.Core.ModelView.AuthViewModel.LoginData;
 using Investor.Core.ModelView.AuthViewModel.RegisterData;
 using Investor.Core.ModelView.AuthViewModel.RoleData;
 using Investor.Core.ModelView.AuthViewModel.UpdateData;
-using Investor.Core.Entity.ChatAndNotification;
+using Investor.Core.Entity.ChatandUserConnection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

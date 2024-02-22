@@ -14,7 +14,7 @@ using Investor.RepositoryLayer.Interfaces;
 using Investor.Core.ModelView.AuthViewModel.ChangePasswordData;
 using Investor.Core.ModelView.AuthViewModel.UpdateData;
 using Microsoft.EntityFrameworkCore;
-using Investor.Core.Entity.ChatAndNotification;
+using Investor.Core.Entity.ChatandUserConnection;
 using Investor.Core.Entity.PostData;
 
 namespace Investor.Controllers.API;

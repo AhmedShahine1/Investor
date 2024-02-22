@@ -1,5 +1,4 @@
 ﻿using Investor.Core.Entity.ApplicationData;
-using Investor.Core.Entity.ChatAndNotification;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +7,7 @@ using System.Net;
 using Investor.Core.Entity.PostData;
 using Investor.Core.Entity.EvaluationData;
 using Investor.Core.Entity.ConnectionData;
+using Investor.Core.Entity.ChatandUserConnection;
 
 namespace Investor.Core
 {
@@ -23,7 +23,7 @@ namespace Investor.Core
         //-----------------------------------------------------------------------------------
         public virtual DbSet<EvaluationUser> EvaluationUsers { get; set; }
         public virtual DbSet<Connection> Connections { get; set; }
-        //public virtual DbSet<MessageChat> MessageChats { get; set; }
+        public virtual DbSet<Chat> Chats { get; set; }
         public virtual DbSet<UserConnection> UserConnections { get; set; }
 
 
@@ -70,6 +70,8 @@ namespace Investor.Core
             modelBuilder.Entity<CommentPost>().HasKey(p => p.CommentId);
 
             modelBuilder.Entity<ReactPost>().HasKey(p => p.ReactId);
+
+            modelBuilder.Entity<EvaluationUser>().HasKey(p => p.EvaluationId);
 
             modelBuilder.Entity<CommentPost>()
                 .HasOne(p => p.Post)

@@ -16,12 +16,12 @@ namespace Investor.Core.DTO.EntityDTO
 
         [Display(Name = "النص")]
         [Required(ErrorMessage = "يجب أدخال النص "), StringLength(int.MaxValue), MinLength(2, ErrorMessage = "يجب أن يكون النص أكبر من 2 حروف")]
-        [ExclusiveField("Attachment", ErrorMessage = "Either Text or Attachment should be entered, not both.")]
+        [ExclusiveField("Attachment", ErrorMessage = "Either Text or Attachment should be entered.")]
         public string PostText { get; set; }
 
         //---------------------------------------
         [Display(Name = " الملفات  ")]
-        [ExclusiveField("PostText", ErrorMessage = "Either Post or Attachment should be entered, not both.")]
+        [ExclusiveField("PostText", ErrorMessage = "Either Text or Attachment should be entered.")]
         public List<IFormFile> Attachment { get; set; }
 
         public List<string> AttachmentUrls { get; set; } = new List<string>();

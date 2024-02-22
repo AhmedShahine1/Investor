@@ -11,6 +11,8 @@ namespace Investor.Core.Entity.EvaluationData
 {
     public class Evaluation : BaseEntity
     {
+        public string EvaluationId { get; set; } = Guid.NewGuid().ToString();
+
         [ForeignKey("User")]
         [Display(Name = "اسم العميل ")]
         public string UserId { get; set; }

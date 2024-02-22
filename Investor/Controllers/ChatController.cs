@@ -1,0 +1,402 @@
+﻿using Investor.BusinessLayer.Interfaces;
+using Investor.Core.DTO;
+using Investor.Core.DTO.EntityDTO;
+using Investor.Core.Entity.ApplicationData;
+using Investor.Core.Entity.ChatandUserConnection;
+using Investor.Core.Entity.PostData;
+using Investor.Core.Helpers;
+using Investor.RepositoryLayer.Interfaces;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Net.Http.Headers;
+using System.Net.Mail;
+
+namespace Investor.Controllers
+{
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+    public class ChatController : BaseController , IActionFilter
+    {
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly IFileHandling _fileHandling;
+        private readonly BaseResponse _baseResponse;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private ApplicationUser _user;
+
+        public ChatController(IUnitOfWork unitOfWork, IFileHandling fileHandling, IHttpContextAccessor httpContextAccessor)
+        {
+            _unitOfWork = unitOfWork;
+            _fileHandling = fileHandling;
+            _baseResponse = new BaseResponse();
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public void OnActionExecuting(ActionExecutingContext context)
+        {
+            var accessToken = Request.Headers[HeaderNames.Authorization];
+            if (string.IsNullOrEmpty(accessToken))
+                return;
+
+            var userId = User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
+            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == false)
+                .FirstOrDefault();
+            _user = user;
+        }
+
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public void OnActionExecuted(ActionExecutedContext context)
+        {
+
+        }
+        //--------------------------------------------------------------------------------------------------------Send Message
+        [HttpPost("SendMessage")]
+        public async Task<ActionResult<BaseResponse>> SendMessage([FromHeader] string lang, [FromForm] ChatDTO chatDTO)
+        {
+            if (_user == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذا الحساب غير موجود "
+                    : "The User Not Exist ";
+                return Ok(_baseResponse);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _baseResponse.ErrorMessage = (lang == "ar") ? "خطأ في البيانات" : "Error in data";
+                _baseResponse.ErrorCode = (int)Errors.TheModelIsInvalid;
+                _baseResponse.Data = new
+                {
+                    message = string.Join("; ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage))
+                };
+                return Ok(_baseResponse);
+            }
+
+            var ReceiveUser = await _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status == false).FirstOrDefaultAsync();
+            if (ReceiveUser == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? " الحساب الذي تراسله غير موجود "
+                    : "The Receive User Not Exist ";
+                return Ok(_baseResponse);
+            }
+
+            if (chatDTO.Attachment.Count() != 0)
+                try
+                {
+                    foreach (var ChatImg in chatDTO.Attachment)
+                    {
+                        string img = await _fileHandling.UploadFile(ChatImg, "Chat");
+                        chatDTO.AttachmentUrls.Add(img);
+                    }
+                }
+                catch
+                {
+                    _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
+                    _baseResponse.ErrorMessage = lang == "ar"
+                        ? "خطأ في رفع الملفات "
+                        : "Error In Upload Attachments ";
+                    return Ok(_baseResponse);
+                }
+
+            var Chat = new Chat
+            {
+                Message = chatDTO.Message,
+                SendUserId = _user.Id,
+                ReceiveUserId = ReceiveUser.Id,
+                AttachmentUrl = ConvertListToString(chatDTO.AttachmentUrls)
+            };
+            try
+            {
+                await _unitOfWork.Chats.AddAsync(Chat);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInAddService;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "خطأ في ارسال الرساله "
+                    : "Error In send message ";
+                return Ok(_baseResponse);
+            }
+
+            _baseResponse.ErrorCode = (int)Errors.Success;
+            _baseResponse.ErrorMessage = lang == "ar"
+                ? "تم ارسال الرساله بنجاح"
+                : "The message Has Been Send Successfully";
+
+            return Ok(_baseResponse);
+
+        }
+
+        //--------------------------------------------------------------------------------------------------------Edit Message
+        [HttpPut("EditMessage")]
+        public async Task<ActionResult<BaseResponse>> EditMessage([FromHeader] string lang, [FromForm] ChatDTO chatDTO)
+        {
+            if (_user == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذا الحساب غير موجود "
+                    : "The User Not Exist ";
+                return Ok(_baseResponse);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _baseResponse.ErrorMessage = (lang == "ar") ? "خطأ في البيانات" : "Error in data";
+                _baseResponse.ErrorCode = (int)Errors.TheModelIsInvalid;
+                _baseResponse.Data = new
+                {
+                    message = string.Join("; ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage))
+                };
+                return Ok(_baseResponse);
+            }
+
+            var Message = await _unitOfWork.Chats.FindByQuery(s => s.ChatId == chatDTO.ChatId && s.IsDeleted == false).FirstOrDefaultAsync();
+            if(Message == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذه الرساله غير موجوده"
+                    : "Message Not Exits ";
+                return Ok(_baseResponse);
+
+            }
+
+            if (Message.SendUserId != _user.Id)
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "لا يمكنك تعديل هذه الرساله "
+                    : "Message Not Exits ";
+                return Ok(_baseResponse);
+
+            }
+
+            if (chatDTO.Attachment.Count() != 0)
+                try
+                {
+                    foreach (var ChatImg in chatDTO.Attachment)
+                    {
+                        string img = await _fileHandling.UploadFile(ChatImg, "Chat");
+                        chatDTO.AttachmentUrls.Add(img);
+                    }
+                }
+                catch
+                {
+                    _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
+                    _baseResponse.ErrorMessage = lang == "ar"
+                        ? "خطأ في رفع الملفات "
+                        : "Error In Upload Attachments ";
+                    return Ok(_baseResponse);
+                }
+
+            var Chat = new Chat
+            {
+                ChatId = chatDTO.ChatId,
+                Message = chatDTO.Message,
+                SendUserId = _user.Id,
+                ReceiveUserId = Message.ReceiveUserId,
+                AttachmentUrl = ConvertListToString(chatDTO.AttachmentUrls),
+                IsUpdated = true,
+                UpdatedAt = DateTime.Now,
+            };
+            try
+            {
+                _unitOfWork.Chats.Update(Chat);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInAddService;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "خطأ في تعديل الرساله "
+                    : "Error In Edit message ";
+                return Ok(_baseResponse);
+            }
+
+            _baseResponse.ErrorCode = (int)Errors.Success;
+            _baseResponse.ErrorMessage = lang == "ar"
+                ? "تم تعديل الرساله بنجاح"
+                : "The message Has Been Edit Successfully";
+
+            return Ok(_baseResponse);
+
+        }
+
+        //--------------------------------------------------------------------------------------------------------Get Message
+        [HttpGet("GetMessage")]
+        public async Task<ActionResult<BaseResponse>> GetMessage([FromHeader] string lang, [FromForm] string ReceiveId)
+        {
+            if (_user == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذا الحساب غير موجود "
+                    : "The User Not Exist ";
+                return Ok(_baseResponse);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _baseResponse.ErrorMessage = (lang == "ar") ? "خطأ في البيانات" : "Error in data";
+                _baseResponse.ErrorCode = (int)Errors.TheModelIsInvalid;
+                _baseResponse.Data = new
+                {
+                    message = string.Join("; ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage))
+                };
+                return Ok(_baseResponse);
+            }
+
+            var ReceiveUser = await _unitOfWork.Users.FindByQuery(s => s.Id == ReceiveId).FirstOrDefaultAsync();
+            if(ReceiveUser == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذا الحساب غير موجود "
+                    : "The User Receive Not Exist ";
+                return Ok(_baseResponse);
+            }
+
+            var Messages = await _unitOfWork.Chats.FindByQuery(s => (s.SendUserId == _user.Id && s.ReceiveUserId == ReceiveId) || (s.ReceiveUserId == _user.Id && s.SendUserId == ReceiveId)).Select(x => new
+            {
+                x.ChatId,
+                x.Message,
+                SenderUser = new
+                {
+                    x.SendUser.Id,
+                    x.SendUser.FirstName, 
+                    x.SendUser.LastName,
+                    x.SendUser.Email,
+                },
+                ReceiveUser = new
+                {
+                    x.ReceiveUser.Id,
+                    x.ReceiveUser.FirstName,
+                    x.ReceiveUser.LastName,
+                    x.ReceiveUser.Email,
+                },
+                SendTime = (x.IsUpdated) ? x.UpdatedAt : x.CreatedAt,
+                x.IsRead,
+                x.IsDeleted,
+                x.IsUpdated,
+                Attachment=ConvertStringToList(x.AttachmentUrl)
+            }).ToListAsync();
+            var ReadMessages = await _unitOfWork.Chats.FindByQuery(s => (s.SendUserId == _user.Id && s.ReceiveUserId == ReceiveId)).ToListAsync();
+
+            foreach (var message in ReadMessages)
+            {
+                message.IsRead = true;
+                try
+                {
+                    _unitOfWork.Chats.Update(message);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+                catch
+                {
+                    _baseResponse.ErrorCode = (int)Errors.ErrorInAddService;
+                    _baseResponse.ErrorMessage = lang == "ar"
+                        ? "خطأ في قراءة الرساله "
+                        : "Error In Read message ";
+                    return Ok(_baseResponse);
+                }
+
+            }
+            _baseResponse.ErrorCode = 0;
+            _baseResponse.Data = Messages;
+            return Ok(_baseResponse);
+
+        }
+
+        //--------------------------------------------------------------------------------------------------------Delete Message
+        [HttpDelete("DeleteMessage")]
+        public async Task<ActionResult<BaseResponse>> DeleteMessage([FromHeader] string lang, [FromForm] string MessageId)
+        {
+            if (_user == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذا الحساب غير موجود "
+                    : "The User Not Exist ";
+                return Ok(_baseResponse);
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _baseResponse.ErrorMessage = (lang == "ar") ? "خطأ في البيانات" : "Error in data";
+                _baseResponse.ErrorCode = (int)Errors.TheModelIsInvalid;
+                _baseResponse.Data = new
+                {
+                    message = string.Join("; ", ModelState.Values.SelectMany(x => x.Errors).Select(x => x.ErrorMessage))
+                };
+                return Ok(_baseResponse);
+            }
+
+            var Message = await _unitOfWork.Chats.FindByQuery(s => s.ChatId == MessageId && s.IsDeleted == false).FirstOrDefaultAsync();
+            if (Message == null)
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "هذه الرساله غير موجوده"
+                    : "Message Not Exits ";
+                return Ok(_baseResponse);
+
+            }
+
+            if (Message.SendUserId != _user.Id)
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "لا يمكنك تعديل هذه الرساله "
+                    : "Message Not Exits ";
+                return Ok(_baseResponse);
+
+            }
+
+            Message.IsDeleted = true;
+            Message.DeletedAt = DateTime.Now;
+            try
+            {
+                _unitOfWork.Chats.Update(Message);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch
+            {
+                _baseResponse.ErrorCode = (int)Errors.ErrorInAddService;
+                _baseResponse.ErrorMessage = lang == "ar"
+                    ? "خطأ في حذف الرساله "
+                    : "Error In Delete Message ";
+                return Ok(_baseResponse);
+            }
+
+            _baseResponse.ErrorCode = (int)Errors.Success;
+            _baseResponse.ErrorMessage = lang == "ar"
+                ? "تم حذف الرساله بنجاح"
+                : "The Message Has Been Deleted Successfully";
+
+            return Ok(_baseResponse);
+
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------------------
+        //Function
+        static string ConvertListToString(List<string> list)
+        {
+            return string.Join(",", list);
+        }
+
+        static List<string> ConvertStringToList(string inputString)
+        {
+            // Split the input string by commas and convert it to a List<string>
+            return inputString.Split(',').ToList();
+        }
+
+    }
+}

@@ -1,6 +1,6 @@
 ﻿using Investor.Core;
 using Investor.Core.Entity.ApplicationData;
-using Investor.Core.Entity.ChatAndNotification;
+using Investor.Core.Entity.ChatandUserConnection;
 using Investor.Core.Entity.ConnectionData;
 using Investor.Core.Entity.EvaluationData;
 using Investor.Core.Entity.PostData;
@@ -24,7 +24,7 @@ public class UnitOfWork : IUnitOfWork
 
     public IBaseRepository<Connection> Connections { get; private set; }
 
-    //public IBaseRepository<MessageChat> MessageChats { get; private set; }
+    public IBaseRepository<Chat> Chats { get; private set; }
     public IBaseRepository<UserConnection> UserConnections { get; private set; }
 
     public UnitOfWork(ApplicationDbContext context)
@@ -38,7 +38,7 @@ public class UnitOfWork : IUnitOfWork
         Catagories = new BaseRepository<Category>(_context);
         EvaluationUser = new BaseRepository<EvaluationUser>(_context);
         Connections = new BaseRepository<Connection>(_context);
-        //MessageChats = new BaseRepository<MessageChat>(_context);
+        Chats = new BaseRepository<Chat>(_context);
         UserConnections = new BaseRepository<UserConnection>(_context);
     }
 
