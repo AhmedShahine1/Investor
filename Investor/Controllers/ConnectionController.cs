@@ -15,7 +15,7 @@ using Microsoft.Net.Http.Headers;
 namespace Investor.Controllers
 {
     [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-    public class ConnectionController : BaseController
+    public class ConnectionController : BaseController , IActionFilter
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IFileHandling _fileHandling;
@@ -39,7 +39,7 @@ namespace Investor.Controllers
                 return;
 
             var userId = User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
-            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == false)
+            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == true)
                 .FirstOrDefault();
             _user = user;
         }
@@ -74,7 +74,12 @@ namespace Investor.Controllers
                 };
                 return Ok(_baseResponse);
             }
-
+            if(_user.Id == connectionDTO.TargetUserId)
+            {
+                _baseResponse.ErrorMessage = (lang == "ar") ? "لا يمكن ارسال طلب صداقه لنفسك" : "Can't send connection to yourself";
+                _baseResponse.ErrorCode = (int)Errors.TheModelIsInvalid;
+                return Ok(_baseResponse);
+            }
             var Connection = await _unitOfWork.Connections.FindByQuery(s => (s.User1Id == _user.Id && s.User2Id == connectionDTO.TargetUserId) || (s.User2Id == _user.Id && s.User1Id == connectionDTO.TargetUserId)).FirstOrDefaultAsync();
             if (Connection != null)
             {
@@ -88,7 +93,11 @@ namespace Investor.Controllers
             {
                 User1Id = _user.Id,
                 User2Id = connectionDTO.TargetUserId,
+                IsAgree = false
             };
+            await _unitOfWork.Connections.AddAsync(Connect);
+            await _unitOfWork.SaveChangesAsync();
+
             _baseResponse.ErrorCode = (int)Errors.Success;
             _baseResponse.ErrorMessage = lang == "ar"
                 ? "تم ارسال طلب الصداقه بنجاح"
@@ -220,7 +229,13 @@ namespace Investor.Controllers
                 return Ok(_baseResponse);
             }
 
-            var Connection = await _unitOfWork.Connections.FindByQuery(s => s.User1Id == _user.Id && s.User2Id == _user.Id  && s.IsAgree == true).FirstOrDefaultAsync();
+            var Connection = await _unitOfWork.Connections.FindByQuery(s => (s.User1Id == _user.Id || s.User2Id == _user.Id) && s.IsAgree == true).FirstOrDefaultAsync();
+            if (Connection == null)
+            {
+                _baseResponse.ErrorCode = 0;
+                _baseResponse.Data = null;
+                return Ok(_baseResponse);
+            }
             var data = new Connection
             {
                 User1Id = Connection.User1Id,
@@ -245,7 +260,13 @@ namespace Investor.Controllers
                 return Ok(_baseResponse);
             }
 
-            var Connection = await _unitOfWork.Connections.FindByQuery(s => s.User1Id == _user.Id && s.User2Id == _user.Id && s.IsAgree == false).FirstOrDefaultAsync();
+            var Connection = await _unitOfWork.Connections.FindByQuery(s => s.User1Id == _user.Id || s.User2Id == _user.Id && s.IsAgree == false).FirstOrDefaultAsync();
+            if (Connection == null)
+            {
+                _baseResponse.ErrorCode = 0;
+                _baseResponse.Data = null;
+                return Ok(_baseResponse);
+            }
             var data = new Connection
             {
                 User1Id = Connection.User1Id,

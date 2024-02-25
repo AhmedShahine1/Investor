@@ -43,7 +43,7 @@ namespace Investor.Controllers
                 return;
 
             var userId = User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
-            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == false)
+            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == true)
                 .FirstOrDefault();
             _user = user;
         }
@@ -77,7 +77,7 @@ namespace Investor.Controllers
                 return Ok(_baseResponse);
             }
 
-            var ReceiveUser = await _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status == false).FirstOrDefaultAsync();
+            var ReceiveUser = await _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status == true).FirstOrDefaultAsync();
             if (ReceiveUser == null)
             {
                 _baseResponse.ErrorCode = (int)Errors.TheUserNotExistOrDeleted;
@@ -87,7 +87,7 @@ namespace Investor.Controllers
                 return Ok(_baseResponse);
             }
 
-            if (chatDTO.Attachment.Count() != 0)
+            if (chatDTO.Attachment != null)
                 try
                 {
                     foreach (var ChatImg in chatDTO.Attachment)
@@ -110,7 +110,8 @@ namespace Investor.Controllers
                 Message = chatDTO.Message,
                 SendUserId = _user.Id,
                 ReceiveUserId = ReceiveUser.Id,
-                AttachmentUrl = ConvertListToString(chatDTO.AttachmentUrls)
+                AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
+                IsRead = false
             };
             try
             {
@@ -160,7 +161,7 @@ namespace Investor.Controllers
             }
 
             var Message = await _unitOfWork.Chats.FindByQuery(s => s.ChatId == chatDTO.ChatId && s.IsDeleted == false).FirstOrDefaultAsync();
-            if(Message == null)
+            if (Message == null)
             {
                 _baseResponse.ErrorCode = (int)Errors.ErrorInUploadPhoto;
                 _baseResponse.ErrorMessage = lang == "ar"
@@ -180,7 +181,7 @@ namespace Investor.Controllers
 
             }
 
-            if (chatDTO.Attachment.Count() != 0)
+            if (chatDTO.Attachment != null)
                 try
                 {
                     foreach (var ChatImg in chatDTO.Attachment)
@@ -198,19 +199,15 @@ namespace Investor.Controllers
                     return Ok(_baseResponse);
                 }
 
-            var Chat = new Chat
-            {
-                ChatId = chatDTO.ChatId,
-                Message = chatDTO.Message,
-                SendUserId = _user.Id,
-                ReceiveUserId = Message.ReceiveUserId,
-                AttachmentUrl = ConvertListToString(chatDTO.AttachmentUrls),
-                IsUpdated = true,
-                UpdatedAt = DateTime.Now,
-            };
+            Message.Message = (chatDTO.Message != null) ? chatDTO.Message : Message.Message;
+            Message.SendUserId = _user.Id;
+            Message.ReceiveUserId = Message.ReceiveUserId;
+            Message.AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : Message.AttachmentUrl;
+            Message.IsUpdated = true;
+            Message.UpdatedAt = DateTime.Now;
             try
             {
-                _unitOfWork.Chats.Update(Chat);
+                _unitOfWork.Chats.Update(Message);
                 await _unitOfWork.SaveChangesAsync();
             }
             catch
@@ -228,7 +225,6 @@ namespace Investor.Controllers
                 : "The message Has Been Edit Successfully";
 
             return Ok(_baseResponse);
-
         }
 
         //--------------------------------------------------------------------------------------------------------Get Message

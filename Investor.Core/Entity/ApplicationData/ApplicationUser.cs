@@ -13,7 +13,7 @@ public class ApplicationUser : IdentityUser
 {
 
     public bool IsAdmin { get; set; } = false;//if true, user is admin
-    public bool Status { get; set; } = true;//true=active,false=deactive
+    public bool Status { get; set; } = true;//true=active,false=disactive
     //-------------------------------------------------------------------
     public UserType UserType { get; set; } // 0 = Admin,1 = Investor ,2 = Youth
     public string Qualification { get; set; } // only for center and freelancer

@@ -42,7 +42,7 @@ namespace Investor.Controllers
                 return;
 
             var userId = User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
-            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == false)
+            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == true)
                 .FirstOrDefault();
             _user = user;
         }
@@ -356,7 +356,7 @@ namespace Investor.Controllers
                     : "The Category Not Exist ";
                 return Ok(_baseResponse);
             }
-            if (postDTO.Attachment.Count()!=0)
+            if (postDTO.Attachment != null)
                 try
                 {
                     foreach (var PostImg in postDTO.Attachment)
@@ -379,8 +379,8 @@ namespace Investor.Controllers
                 UserId = _user.Id,
                 PostText = postDTO.PostText,
                 AttachmentUrls = postDTO.AttachmentUrls,
-                Attachment = postDTO.Attachment,
-                AttachmentUrl = ConvertListToString(postDTO.AttachmentUrls),
+                Attachment = (postDTO.Attachment != null) ? postDTO.Attachment : null,
+                AttachmentUrl = (postDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(postDTO.AttachmentUrls) : null,
                 CatagoryId = postDTO.CatagoryId
             };
 

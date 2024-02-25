@@ -31,7 +31,7 @@ public class EvaluationsController : BaseController , IActionFilter
             return;
 
         var userId = User.Claims.First(i => i.Type == "uid").Value; // will give the user's userId
-        var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == false)
+        var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status == true)
             .FirstOrDefault();
         _user = user;
         
@@ -115,6 +115,17 @@ public class EvaluationsController : BaseController , IActionFilter
             return Ok(_baseResponse);
         }
         var userEvaluation = await _unitOfWork.EvaluationUser.FindByQuery(s => s.TargetUserId == _user.Id ).ToListAsync();
+        if(userEvaluation.Count() == 0)
+        {
+            _baseResponse.ErrorCode = 0;
+            _baseResponse.Data = new 
+            {
+                UserId = _user.Id,
+                AverageRating = 0,
+                AllRating = 0
+            };
+            return Ok(_baseResponse);
+        }
         double averageRating = userEvaluation.Average(r => r.NumberOfStars);
         double allRating = userEvaluation.Sum(r => r.NumberOfStars);
         var Rating = new
@@ -141,6 +152,18 @@ public class EvaluationsController : BaseController , IActionFilter
             return Ok(_baseResponse);
         }
         var userEvaluation = await _unitOfWork.EvaluationUser.FindByQuery(s => s.TargetUserId == id).ToListAsync();
+        if (userEvaluation.Count() == 0)
+        {
+            _baseResponse.ErrorCode = 0;
+            _baseResponse.Data = new
+            {
+                UserId = _user.Id,
+                AverageRating = 0,
+                AllRating = 0
+            };
+            return Ok(_baseResponse);
+        }
+
         double averageRating = userEvaluation.Average(r => r.NumberOfStars);
         double allRating = userEvaluation.Sum(r => r.NumberOfStars);
         var Rating = new

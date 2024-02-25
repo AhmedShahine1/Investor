@@ -27,7 +27,7 @@ namespace Investor.Core.DTO.EntityDTO
         [ExclusiveField("Message", ErrorMessage = "Either Message or Attachment should be entered.")]
         public List<IFormFile> Attachment { get; set; }
 
-        public List<string> AttachmentUrls { get; set; }
+        public List<string> AttachmentUrls { get; set; } = new List<string>();
 
     }
 }
