@@ -1,6 +1,7 @@
 using Investor.Core;
 using Investor.Extensions;
 using Investor.Middleware;
+using Investor.SignalR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -19,10 +20,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.Configure<ApiBehaviorOptions>(options => options.SuppressModelStateInvalidFilter = true); // validation Error Api
 builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 
-
-
+builder.Services.AddSignalR();
+builder.Services.AddCors(options => {
+    options.AddPolicy("CORSPolicy", builder => builder.AllowAnyMethod().AllowAnyHeader().AllowCredentials().SetIsOriginAllowed((hosts) => true));
+});
 // context && json services && IBaseRepository && IUnitOfWork Service
 builder.Services.AddContextServices(builder.Configuration);
+builder.Services.AddControllersWithViews();
 
 // Services [IAccountService, IPhotoHandling, AddAutoMapper, Hangfire ,
 // Session , SignalR ,[ INotificationService, FcmNotificationSetting, FcmSender,ApnSender ]  ]
@@ -47,14 +51,14 @@ else
     app.UseMiddleware<ExceptionMiddleware>();
 }
 app.UseSwaggerDocumentation();
-
+app.UseCors("CORSPolicy");
+app.UseRouting();
+app.MapHub<ChatHub>("/Chat");
 app.UseStaticFiles();
 app.UseHttpsRedirection();
-app.UseRouting();
 app.UseCors();
 
 app.UseAuthentication();
-app.UseAuthorization();
 
 app.UseApplicationMiddleware();
 

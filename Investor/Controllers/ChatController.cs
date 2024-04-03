@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Net.Http.Headers;
@@ -115,8 +116,6 @@ namespace Investor.Controllers
             };
             try
             {
-                await _unitOfWork.Chats.AddAsync(Chat);
-                await _unitOfWork.SaveChangesAsync();
             }
             catch
             {
