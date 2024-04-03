@@ -36,57 +36,60 @@ namespace Investor.SignalR
             }
             var accessToken = Context.GetHttpContext().Request.Query["access_token"];
             var userId = JWT(accessToken);
-
-            if (userId != null)
+            var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == chatDTO.ReceiveUserId && s.IsAgree) || (s.User1Id == chatDTO.ReceiveUserId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
+            if(connection != null)
             {
-                var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
-                              .FirstOrDefault();
-                var ReceivedUser = _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status)
-                                              .FirstOrDefault();
-                if(user != null&& ReceivedUser != null)
+                if (userId != null)
                 {
-                    if (chatDTO.Attachment != null)
-                        try
-                        {
-                            foreach (var ChatImg in chatDTO.Attachment)
+                    var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
+                                  .FirstOrDefault();
+                    var ReceivedUser = _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status)
+                                                  .FirstOrDefault();
+                    if (user != null && ReceivedUser != null)
+                    {
+                        if (chatDTO.Attachment != null)
+                            try
                             {
-                                string img = await _fileHandling.UploadFile(ChatImg, "Chat");
-                                chatDTO.AttachmentUrls.Add(img);
+                                foreach (var ChatImg in chatDTO.Attachment)
+                                {
+                                    string img = await _fileHandling.UploadFile(ChatImg, "Chat");
+                                    chatDTO.AttachmentUrls.Add(img);
+                                }
                             }
-                        }
-                        catch
-                        {
-                            await Clients.Caller.SendAsync("Error", "Error in upload image");
-                        }
+                            catch
+                            {
+                                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error in upload image");
+                            }
 
-                    var Chat = new Chat
-                    {
-                        Message = chatDTO.Message,
-                        SendUserId = user.Id,
-                        ReceiveUserId = ReceivedUser.Id,
-                        AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
-                        IsRead = false
-                    };
-                    try
-                    {
-                        _unitOfWork.Chats.Add(Chat);
-                        await _unitOfWork.SaveChangesAsync();
-                        await Clients.Caller.SendAsync("Message", new
+                        var Chat = new Chat
                         {
-                            Message= chatDTO.Message,
+                            Message = chatDTO.Message,
                             SendUserId = user.Id,
                             ReceiveUserId = ReceivedUser.Id,
                             AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
-                            IsRead = false,
-                            CreatedAt= Chat.CreatedAt
-                        });
+                            IsRead = false
+                        };
+                        try
+                        {
+                            _unitOfWork.Chats.Add(Chat);
+                            await _unitOfWork.SaveChangesAsync();
+                            await Clients.User(connection.ConnectionId).SendAsync("Message", new
+                            {
+                                Message = chatDTO.Message,
+                                SendUserId = user.Id,
+                                ReceiveUserId = ReceivedUser.Id,
+                                AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
+                                IsRead = false,
+                                CreatedAt = Chat.CreatedAt
+                            });
+                        }
+                        catch
+                        {
+                            await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
+                        }
                     }
-                    catch
-                    {
-                        await Clients.Caller.SendAsync("Error", "Error In send message");
-                    }
+                    await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
                 }
-                await Clients.Caller.SendAsync("Error", "Error In send message");
             }
             await Clients.Caller.SendAsync("Error", "Error In send message");
         }
@@ -96,6 +99,7 @@ namespace Investor.SignalR
             var accessToken = Context.GetHttpContext().Request.Query["access_token"];
             var ReceivedId = Context.GetHttpContext().Request.Query["ReceivedId"].ToString();
             var userId = JWT(accessToken);
+            var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == ReceivedId && s.IsAgree) || (s.User1Id == ReceivedId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
             if (userId != null && ReceivedId != null)
             {
                 var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
@@ -143,7 +147,7 @@ namespace Investor.SignalR
                     Attachment = ConvertStringToList(x.AttachmentUrl)
                 }).ToListAsync();
 
-                await Clients.Caller.SendAsync("Message", Messages);
+                await Clients.User(connection.ConnectionId).SendAsync("Message", Messages);
             }
             await base.OnConnectedAsync();
         }
