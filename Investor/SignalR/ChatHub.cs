@@ -91,7 +91,93 @@ namespace Investor.SignalR
                     await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
                 }
             }
-            await Clients.Caller.SendAsync("Error", "Error In send message");
+            await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
+        }
+
+        public async Task EditMessage(ChatDTO chatDTO)
+        {
+            if (chatDTO == null || string.IsNullOrEmpty(chatDTO.ReceiveUserId) || (string.IsNullOrEmpty(chatDTO.Message) && chatDTO.Attachment == null))
+            {
+                return;
+            }
+            var accessToken = Context.GetHttpContext().Request.Query["access_token"];
+            var userId = JWT(accessToken);
+            if (userId == null)
+            {
+                return;
+            }
+            var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == chatDTO.ReceiveUserId && s.IsAgree) || (s.User1Id == chatDTO.ReceiveUserId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
+            if (connection != null)
+            {
+                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error Can't edit message not found connection");
+            }
+            var Message = await _unitOfWork.Chats.FindByQuery(s => s.ChatId == chatDTO.ChatId && s.IsDeleted == false).FirstOrDefaultAsync();
+            if (Message != null)
+            {
+                return;
+            }
+
+            var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
+                            .FirstOrDefault();
+            var ReceivedUser = _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status)
+                                            .FirstOrDefault();
+            if (user != null && ReceivedUser != null)
+            {
+
+                if (chatDTO.Attachment != null)
+                    try
+                    {
+                        foreach (var ChatImg in chatDTO.Attachment)
+                        {
+                            string img = await _fileHandling.UploadFile(ChatImg, "Chat");
+                            chatDTO.AttachmentUrls.Add(img);
+                        }
+                    }
+                    catch
+                    {
+                        await Clients.User(connection.ConnectionId).SendAsync("Error", "Error in upload image");
+                    }
+                Message.Message = (chatDTO.Message != null) ? chatDTO.Message : Message.Message;
+                Message.SendUserId = user.Id;
+                Message.ReceiveUserId = Message.ReceiveUserId;
+                Message.AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : Message.AttachmentUrl;
+                Message.IsUpdated = true;
+                Message.UpdatedAt = DateTime.Now;
+                try
+                {
+                    _unitOfWork.Chats.Update(Message);
+                    await _unitOfWork.SaveChangesAsync();
+                }
+                catch
+                {
+                    await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In Edit message");
+                }
+            }
+            await Clients.User(connection.ConnectionId).SendAsync("MessageEdited", Message);
+        }
+
+        // Method to delete a message
+        public async Task DeleteMessage(string messageId)
+        {
+            if (messageId == null)
+            {
+                return;
+            }
+            var Message = await _unitOfWork.Chats.FindByQuery(s => s.ChatId == messageId && s.IsDeleted == false).FirstOrDefaultAsync();
+            Message.IsDeleted = true;
+            var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == Message.SendUserId && s.User2Id == Message.ReceiveUserId && s.IsAgree) || (s.User1Id == Message.ReceiveUserId && s.User2Id == Message.SendUserId && s.IsAgree)).FirstOrDefault();
+
+            try
+            {
+                _unitOfWork.Chats.Update(Message);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch
+            {
+                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In Delete message");
+            }
+
+            await Clients.User(connection.ConnectionId).SendAsync("MessageDeleted", messageId);
         }
 
         public override async Task OnConnectedAsync()
@@ -100,6 +186,10 @@ namespace Investor.SignalR
             var ReceivedId = Context.GetHttpContext().Request.Query["ReceivedId"].ToString();
             var userId = JWT(accessToken);
             var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == ReceivedId && s.IsAgree) || (s.User1Id == ReceivedId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
+            if(connection == null)
+            {
+                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error You Can't connection");
+            }
             if (userId != null && ReceivedId != null)
             {
                 var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
