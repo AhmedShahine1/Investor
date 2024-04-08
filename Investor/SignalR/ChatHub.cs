@@ -28,70 +28,106 @@ namespace Investor.SignalR
             _httpContextAccessor = httpContextAccessor;
         }
 
+        /// <summary>
+        /// check model is null or not and if you send message or image
+        /// check token and Received user 
+        /// check if 2 user have connection or no 
+        /// get all message between 2 user
+        /// edit all message Received user send to you be read 
+        /// save message in database
+        /// send message to Received user
+        /// </summary>
+        /// <returns>all message between 2 user </returns>
         public async Task SendMessage(ChatDTO chatDTO)
         {
-            if (chatDTO == null || string.IsNullOrEmpty(chatDTO.ReceiveUserId) || (string.IsNullOrEmpty(chatDTO.Message)  && chatDTO.Attachment == null))
+            try
             {
-                return;
-            }
-            var accessToken = Context.GetHttpContext().Request.Query["access_token"];
-            var userId = JWT(accessToken);
-            var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == chatDTO.ReceiveUserId && s.IsAgree) || (s.User1Id == chatDTO.ReceiveUserId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
-            if(connection != null)
-            {
-                if (userId != null)
+                if (chatDTO == null || string.IsNullOrEmpty(chatDTO.ReceiveUserId) || (string.IsNullOrEmpty(chatDTO.Message) && chatDTO.Attachment == null))
                 {
-                    var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
-                                  .FirstOrDefault();
-                    var ReceivedUser = _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status)
-                                                  .FirstOrDefault();
-                    if (user != null && ReceivedUser != null)
-                    {
-                        if (chatDTO.Attachment != null)
-                            try
-                            {
-                                foreach (var ChatImg in chatDTO.Attachment)
-                                {
-                                    string img = await _fileHandling.UploadFile(ChatImg, "Chat");
-                                    chatDTO.AttachmentUrls.Add(img);
-                                }
-                            }
-                            catch
-                            {
-                                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error in upload image");
-                            }
-
-                        var Chat = new Chat
-                        {
-                            Message = chatDTO.Message,
-                            SendUserId = user.Id,
-                            ReceiveUserId = ReceivedUser.Id,
-                            AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
-                            IsRead = false
-                        };
+                    throw new ArgumentException("Message cannot be null or empty.");
+                }
+                var accessToken = Context.GetHttpContext().Request.Query["access_token"];
+                var userId = JWT(accessToken);
+                var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == chatDTO.ReceiveUserId && s.IsAgree) || (s.User1Id == chatDTO.ReceiveUserId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
+                if (connection == null)
+                {
+                    throw new ArgumentException("User not connection with this user.");
+                }
+                if (userId == null)
+                {
+                    throw new ArgumentException("Token is mistake.");
+                }
+                var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
+                .FirstOrDefault();
+                var ReceivedUser = _unitOfWork.Users.FindByQuery(s => s.Id == chatDTO.ReceiveUserId && s.Status)
+                                                .FirstOrDefault();
+                if (user == null && ReceivedUser == null)
+                {
+                    throw new ArgumentException("Not can't found user.");
+                }
+                if (chatDTO.Attachment != null)
                         try
                         {
-                            _unitOfWork.Chats.Add(Chat);
-                            await _unitOfWork.SaveChangesAsync();
-                            await Clients.User(connection.ConnectionId).SendAsync("Message", new
+                            foreach (var ChatImg in chatDTO.Attachment)
                             {
-                                Message = chatDTO.Message,
-                                SendUserId = user.Id,
-                                ReceiveUserId = ReceivedUser.Id,
-                                AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
-                                IsRead = false,
-                                CreatedAt = Chat.CreatedAt
-                            });
+                                string img = await _fileHandling.UploadFile(ChatImg, "Chat");
+                                chatDTO.AttachmentUrls.Add(img);
+                            }
                         }
                         catch
                         {
-                            await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
+                            await Clients.Group(connection.ConnectionId).SendAsync("Error", "Error in upload image");
                         }
+                var ReadMessages = await _unitOfWork.Chats.FindByQuery(s => s.SendUserId == chatDTO.ReceiveUserId && s.ReceiveUserId == user.Id && !s.IsRead).ToListAsync();
+
+                foreach (var message in ReadMessages)
+                {
+                    message.IsRead = true;
+                    try
+                    {
+                        _unitOfWork.Chats.Update(message);
+                        await _unitOfWork.SaveChangesAsync();
                     }
-                    await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
+                    catch
+                    {
+                        Console.WriteLine("An error occurred: Error in update data");
+                        throw;
+
+                    }
+
+                }
+                var Chat = new Chat
+                {
+                    Message = chatDTO.Message,
+                    SendUserId = user.Id,
+                    ReceiveUserId = ReceivedUser.Id,
+                    AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
+                    IsRead = false
+                };
+                try
+                {
+                    _unitOfWork.Chats.Add(Chat);
+                    await _unitOfWork.SaveChangesAsync();
+                    await Clients.Group(connection.ConnectionId).SendAsync("Message", new
+                    {
+                        Message = chatDTO.Message,
+                        SendUserId = user.Id,
+                        ReceiveUserId = ReceivedUser.Id,
+                        AttachmentUrl = (chatDTO.AttachmentUrls.Count() != 0) ? ConvertListToString(chatDTO.AttachmentUrls) : null,
+                        IsRead = false,
+                        CreatedAt = Chat.CreatedAt
+                    });
+                }
+                catch
+                {
+                    await Clients.Group(connection.ConnectionId).SendAsync("Error", "Error In send message");
                 }
             }
-            await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In send message");
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task EditMessage(ChatDTO chatDTO)
@@ -109,7 +145,7 @@ namespace Investor.SignalR
             var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == chatDTO.ReceiveUserId && s.IsAgree) || (s.User1Id == chatDTO.ReceiveUserId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
             if (connection != null)
             {
-                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error Can't edit message not found connection");
+                await Clients.Group(connection.ConnectionId).SendAsync("Error", "Error Can't edit message not found connection");
             }
             var Message = await _unitOfWork.Chats.FindByQuery(s => s.ChatId == chatDTO.ChatId && s.IsDeleted == false).FirstOrDefaultAsync();
             if (Message != null)
@@ -135,7 +171,7 @@ namespace Investor.SignalR
                     }
                     catch
                     {
-                        await Clients.User(connection.ConnectionId).SendAsync("Error", "Error in upload image");
+                        await Clients.Group(connection.ConnectionId).SendAsync("Error", "Error in upload image");
                     }
                 Message.Message = (chatDTO.Message != null) ? chatDTO.Message : Message.Message;
                 Message.SendUserId = user.Id;
@@ -150,13 +186,12 @@ namespace Investor.SignalR
                 }
                 catch
                 {
-                    await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In Edit message");
+                    await Clients.Group(connection.ConnectionId).SendAsync("Error", "Error In Edit message");
                 }
             }
-            await Clients.User(connection.ConnectionId).SendAsync("MessageEdited", Message);
+            await Clients.Group(connection.ConnectionId).SendAsync("MessageEdited", Message);
         }
 
-        // Method to delete a message
         public async Task DeleteMessage(string messageId)
         {
             if (messageId == null)
@@ -177,26 +212,38 @@ namespace Investor.SignalR
                 await Clients.User(connection.ConnectionId).SendAsync("Error", "Error In Delete message");
             }
 
-            await Clients.User(connection.ConnectionId).SendAsync("MessageDeleted", messageId);
+            await Clients.Group(connection.ConnectionId).SendAsync("MessageDeleted", messageId);
         }
 
+        /// <summary>
+        /// create connection with server in signalr 
+        /// check token and Received user 
+        /// check if 2 user have connection or no 
+        /// get all message between 2 user
+        /// edit all message Received user send to you be read 
+        /// </summary>
+        /// <returns>all message between 2 user </returns>
         public override async Task OnConnectedAsync()
         {
             var accessToken = Context.GetHttpContext().Request.Query["access_token"];
             var ReceivedId = Context.GetHttpContext().Request.Query["ReceivedId"].ToString();
             var userId = JWT(accessToken);
             var connection = _unitOfWork.Connections.FindByQuery(s => (s.User1Id == userId && s.User2Id == ReceivedId && s.IsAgree) || (s.User1Id == ReceivedId && s.User2Id == userId && s.IsAgree)).FirstOrDefault();
-            if(connection == null)
+            try
             {
-                await Clients.User(connection.ConnectionId).SendAsync("Error", "Error You Can't connection");
-            }
-            if (userId != null && ReceivedId != null)
-            {
+                if (connection == null)
+                {
+                    throw new ArgumentException("Error You Can't connection");
+                }
+                if (userId == null && ReceivedId == null)
+                {
+                    throw new ArgumentException("Not can't found user.");
+                }
                 var user = _unitOfWork.Users.FindByQuery(s => s.Id == userId && s.Status)
-                                              .FirstOrDefault();
-                var ReceivedUser= _unitOfWork.Users.FindByQuery(s => s.Id == ReceivedId && s.Status)
-                                              .FirstOrDefault();
-                var ReadMessages = await _unitOfWork.Chats.FindByQuery(s => (s.SendUserId == ReceivedId && s.ReceiveUserId == user.Id)).ToListAsync();
+                                                .FirstOrDefault();
+                var ReceivedUser = _unitOfWork.Users.FindByQuery(s => s.Id == ReceivedId && s.Status)
+                                                .FirstOrDefault();
+                var ReadMessages = await _unitOfWork.Chats.FindByQuery(s => s.SendUserId == ReceivedId && s.ReceiveUserId == user.Id && !s.IsRead).ToListAsync();
 
                 foreach (var message in ReadMessages)
                 {
@@ -208,11 +255,15 @@ namespace Investor.SignalR
                     }
                     catch
                     {
-                        return ;
+                        Console.WriteLine("An error occurred: Error in update data");
+                        throw;
+
                     }
 
                 }
-                var Messages = await _unitOfWork.Chats.FindByQuery(s => (s.SendUserId == user.Id && s.ReceiveUserId == ReceivedId) || (s.ReceiveUserId == user.Id && s.SendUserId == ReceivedId)).Select(x => new
+                await Groups.AddToGroupAsync(Context.ConnectionId, connection.ConnectionId);
+                await base.OnConnectedAsync();
+                var Messages = await _unitOfWork.Chats.FindByQuery(s => (s.SendUserId == userId && s.ReceiveUserId == ReceivedId) || (s.ReceiveUserId == userId && s.SendUserId == ReceivedId)).Select(x => new
                 {
                     x.ChatId,
                     x.Message,
@@ -234,12 +285,19 @@ namespace Investor.SignalR
                     x.IsRead,
                     x.IsDeleted,
                     x.IsUpdated,
-                    Attachment = ConvertStringToList(x.AttachmentUrl)
+                    Attachment = (x.AttachmentUrl == null) ? null : ConvertStringToList(x.AttachmentUrl)
                 }).ToListAsync();
-
-                await Clients.User(connection.ConnectionId).SendAsync("Message", Messages);
+                foreach (var message in Messages)
+                {
+                    await Clients.Group(connection.ConnectionId).SendAsync("Message", message);
+                }
             }
-            await base.OnConnectedAsync();
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                throw;
+
+            }
         }
 
         public override async Task OnDisconnectedAsync(Exception exception)

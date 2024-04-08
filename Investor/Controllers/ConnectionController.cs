@@ -238,6 +238,7 @@ namespace Investor.Controllers
             }
             var data = new Connection
             {
+                IsAgree= true,
                 User1Id = Connection.User1Id,
                 User2Id = Connection.User2Id,
             };
